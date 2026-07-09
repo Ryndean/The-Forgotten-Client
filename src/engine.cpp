@@ -2194,7 +2194,13 @@ void Engine::onLMouseDown(Sint32 x, Sint32 y)
 			Tile* tile = g_map.findTile(x, y, m_gameWindowRect, m_scaledSize, m_scale, topCreature, true);
 			if(tile)
 			{
-				Thing* thing = tile->getTopLookThing();
+				// getTopMoveThing() (not getTopLookThing()) -- this is initiating a drag/move
+				// action, not a look action. getTopLookThing() never checks m_creatures at all,
+				// so for a creature standing on plain ground it always fell through to m_ground,
+				// silently sending a move request for the floor tile instead of the creature --
+				// which is never moveable, giving "You cannot move this object." for every
+				// creature type (player/NPC/monster) regardless of its actual pushable flag.
+				Thing* thing = tile->getTopMoveThing();
 				if(thing)
 				{
 					Position& position = tile->getPosition();
