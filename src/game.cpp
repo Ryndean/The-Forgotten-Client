@@ -1721,7 +1721,14 @@ void Game::checkLocalCreatureMovement()
 			m_playerCurrentDir = DIRECTION_INVALID;
 
 			Tile* toTile = g_map.getTile(topos);
-			if(toTile && toTile->isWalkable())
+			Tile* fromTile = g_map.getTile(pos);
+			// Classic 7.4: stacking more than one levitation-causing item makes a tile
+			// unwalkable from an ordinary (lower) same-floor tile -- mirrors the gameserver's
+			// Tile::queryAdd rule (fromTile.getHeight() - toTile.getHeight() < -1 => blocked),
+			// so the client doesn't animate a walk attempt the server always rejects. Later
+			// Tibia versions removed this cap entirely, but this build is locked to classic behavior.
+			bool heightBlocked = fromTile && toTile && (fromTile->getHeightCount() - toTile->getHeightCount() < -1);
+			if(toTile && toTile->isWalkable() && !heightBlocked)
 			{
 				prewalk = true;
 				sendwalk = true;

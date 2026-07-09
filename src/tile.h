@@ -74,6 +74,7 @@ class Tile
 		bool isLookingPossible();
 		bool isWalkable();
 		bool isPathable();
+		Sint32 getHeightCount();
 		bool mustHookEast();
 		bool mustHookSouth();
 		SDL_INLINE bool hasTranslucentLight() {return m_hasTranslucentLight;}

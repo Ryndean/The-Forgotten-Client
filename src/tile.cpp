@@ -766,6 +766,28 @@ bool Tile::isPathable()
 	return true;
 }
 
+Sint32 Tile::getHeightCount()
+{
+	Sint32 height = 0;
+	if(m_ground && m_ground->getThingType() && m_ground->getThingType()->hasFlag(ThingAttribute_Elevation))
+		++height;
+
+	for(std::vector<Item*>::iterator it = m_topItems.begin(), end = m_topItems.end(); it != end; ++it)
+	{
+		Item* item = (*it);
+		if(item->getThingType() && item->getThingType()->hasFlag(ThingAttribute_Elevation))
+			++height;
+	}
+
+	for(std::vector<Item*>::iterator it = m_downItems.begin(), end = m_downItems.end(); it != end; ++it)
+	{
+		Item* item = (*it);
+		if(item->getThingType() && item->getThingType()->hasFlag(ThingAttribute_Elevation))
+			++height;
+	}
+	return height;
+}
+
 bool Tile::mustHookEast()
 {
 	if(m_ground && m_ground->getThingType() && m_ground->getThingType()->hasFlag(ThingAttribute_HookEast))
