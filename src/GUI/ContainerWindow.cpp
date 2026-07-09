@@ -344,8 +344,12 @@ void UTIL_createContainerWindow(Uint8 index)
 	GUI_PanelWindow* pPanel = g_engine.getPanel(windowId);
 	if(pPanel)
 	{
-		//Let's keep our window position :)
+		//Let's keep our window position on screen, but scroll back to the top - this is a genuine
+		//(re)open (e.g. navigating to the parent/child container), not just a content refresh.
 		UTIL_recreateContainerWindow(index, pPanel);
+		GUI_ContainerContainer* pContainer = SDL_static_cast(GUI_ContainerContainer*, pPanel->getChild(CONTAINER_CONTAINER_EVENTID));
+		if(pContainer)
+			pContainer->resetScrollBar();
 		return;
 	}
 
@@ -353,7 +357,10 @@ void UTIL_createContainerWindow(Uint8 index)
 	if(!container)
 		return;
 
-	Sint32 defaultHeight = 40 * SDL_static_cast(Sint32, UTIL_max<size_t>(1, ((container->getItems().size() + 3) / 4)));
+	// 37 (not 40) per row: the actual item-slot vertical pitch is 37px (see the GUI_ContainerItem
+	// iRect y-step of 37 in UTIL_recreateContainerWindow). Allocating 40 left ~3px of dead space
+	// per row below the last row of slots.
+	Sint32 defaultHeight = 37 * SDL_static_cast(Sint32, UTIL_max<size_t>(1, ((container->getItems().size() + 3) / 4)));
 	GUI_PanelWindow* newWindow = new GUI_PanelWindow(iRect(0, 0, GAME_PANEL_FIXED_WIDTH - 4, 19 + defaultHeight + (container->hasPages() ? 24 : 0)), true, windowId, true);
 	newWindow->setEventCallback(&container_Events, container_CreateEvent(index, CONTAINER_RESIZE_WIDTH_EVENTID), container_CreateEvent(index, CONTAINER_RESIZE_HEIGHT_EVENTID), container_CreateEvent(index, CONTAINER_EXIT_WINDOW_EVENTID));
 	GUI_ContainerImage* newImage = new GUI_ContainerImage(iRect(2, 0, 12, 12), index);
@@ -429,24 +436,12 @@ void GUI_ContainerContainer::onLMouseUp(Sint32 x, Sint32 y)
 void GUI_ContainerContainer::render()
 {
 	GUI_Container::render();
-	if(m_selected)
-	{
-		if(g_engine.getAction() != CLIENT_ACTION_MOVEITEM)
-		{
-			m_selected = false;
-			return;
-		}
-
-		Container* container = g_game.findContainer(m_index);
-		if(container)
-		{
-			auto& renderer = g_engine.getRender();
-			if(container->isUnlocked())
-				renderer->drawRectangle(m_tRect.x1, m_tRect.y1, m_tRect.x2, m_tRect.y2, 1, 255, 255, 255, 255);
-			else
-				renderer->drawRectangle(m_tRect.x1, m_tRect.y1, m_tRect.x2, m_tRect.y2, 1, 255, 0, 0, 255);
-		}
-	}
+	// Only the individual slot under the cursor is highlighted (done per-slot in
+	// GUI_ContainerItem::render), matching the real 7.72 client. We intentionally do NOT
+	// outline the whole container here -- m_selected is still kept up to date by onMouseMove
+	// so the "drop anywhere in the container to append" action (onLMouseUp) keeps working.
+	if(m_selected && g_engine.getAction() != CLIENT_ACTION_MOVEITEM)
+		m_selected = false;
 }
 
 GUI_ContainerItem::GUI_ContainerItem(iRect boxRect, Uint8 cid, size_t index, Uint32 internalID) : m_index(index), m_cid(cid)
@@ -525,20 +520,23 @@ void GUI_ContainerItem::render()
 
 	ItemUI* item = container->getItem(m_index);
 	if(item)
-	{
 		item->render(m_tRect.x1, m_tRect.y1, m_tRect.y2);
-		if(m_selected)
-		{
-			if(g_engine.getAction() != CLIENT_ACTION_MOVEITEM)
-			{
-				m_selected = false;
-				return;
-			}
 
-			if(container->isUnlocked())
-				renderer->drawRectangle(m_tRect.x1 - 1, m_tRect.y1 - 1, m_tRect.x2 + 2, m_tRect.y2 + 2, 1, 255, 255, 255, 255);
-			else
-				renderer->drawRectangle(m_tRect.x1 - 1, m_tRect.y1 - 1, m_tRect.x2 + 2, m_tRect.y2 + 2, 1, 255, 0, 0, 255);
+	// Highlight the hovered slot whether or not it holds an item, so dragging over the empty
+	// part of a container still shows exactly which box the item would drop into (matches the
+	// real 7.72 client). Previously this was gated behind if(item), so empty slots gave no
+	// feedback and the whole-container outline was used instead.
+	if(m_selected)
+	{
+		if(g_engine.getAction() != CLIENT_ACTION_MOVEITEM)
+		{
+			m_selected = false;
+			return;
 		}
+
+		if(container->isUnlocked())
+			renderer->drawRectangle(m_tRect.x1 - 1, m_tRect.y1 - 1, m_tRect.x2 + 2, m_tRect.y2 + 2, 1, 255, 255, 255, 255);
+		else
+			renderer->drawRectangle(m_tRect.x1 - 1, m_tRect.y1 - 1, m_tRect.x2 + 2, m_tRect.y2 + 2, 1, 255, 0, 0, 255);
 	}
 }
