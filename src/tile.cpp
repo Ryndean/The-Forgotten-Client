@@ -649,7 +649,26 @@ void Tile::removeWalkCreature(Creature* creature)
 void Tile::addEffect(Effect* effect)
 {
 	if(effect->isTopEffect())
+	{
 		m_effects.insert(m_effects.begin(), effect);
+		return;
+	}
+
+	// Effect id 1 (CONST_ME_DRAWBLOOD, the blood hit/cross) must always render above any other
+	// effect already playing on this tile (e.g. a rune's own impact effect) to match the real
+	// client. The server applies damage - which sends the blood effect - before sending a spell's
+	// own impact effect (see Combat::doCombat), so without this the blood ends up drawn first and
+	// gets covered by the spell effect drawn after it. Keeping it order-independent (checked both
+	// ways) means it stays on top no matter which one the server happens to send first.
+	if(effect->getID() == 1)
+	{
+		m_effects.push_back(effect);
+		return;
+	}
+
+	std::vector<Effect*>::iterator it = std::find_if(m_effects.begin(), m_effects.end(), [](Effect* e) {return e->getID() == 1;});
+	if(it != m_effects.end())
+		m_effects.insert(it, effect);
 	else
 		m_effects.push_back(effect);
 }
