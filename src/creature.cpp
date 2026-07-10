@@ -736,15 +736,11 @@ void Creature::renderOnBattle(Sint32 posX, Sint32 posY, bool renderManaBar)
 		squareH -= 2;
 	}
 	if(m_showStaticSquare && g_engine.hasShowPvPFrames())
-	{
 		renderer->drawRectangle(squareX, squareY, squareW, squareH, 1, m_staticSquareRed, m_staticSquareGreen, m_staticSquareBlue, 255);
-		squareX += 1;
-		squareY += 1;
-		squareW -= 2;
-		squareH -= 2;
-	}
-	if(m_showTimedSquare)
-		renderer->drawRectangle(squareX, squareY, squareW, squareH, 1, m_timedSquareRed, m_timedSquareGreen, m_timedSquareBlue, 255);
+
+	// Deliberately no m_showTimedSquare here: the flashing box a creature shows when it lands its
+	// turn attack belongs to the game world only (see render()) -- the original client doesn't
+	// flash it in the battle list, so neither do we.
 
 	posX += 22;
 	posY += 4;
