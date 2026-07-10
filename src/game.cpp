@@ -40,7 +40,7 @@ extern Automap g_automap;
 extern Connection* g_connection;
 extern Uint32 g_frameTime;
 
-Game::Game() : m_autoWalkDestination(0xFFFF, 0xFFFF, 0xFF), m_limitWalkDestination(0xFFFF, 0xFFFF, 0xFF), m_lastCancelWalkPos(0xFFFF, 0xFFFF, 0xFF)
+Game::Game() : m_autoWalkDestination(0xFFFF, 0xFFFF, 0xFF), m_limitWalkDestination(0xFFFF, 0xFFFF, 0xFF), m_lastCancelWalkPos(0xFFFF, 0xFFFF, 0xFF), m_heightBlockStopPos(0xFFFF, 0xFFFF, 0xFF)
 {
 	for(Uint8 skill = 0; skill < Skills_LastAdditionalSkill; ++skill)
 	{
@@ -1553,6 +1553,33 @@ void Game::startAutoWalk(const Position& toPosition)
 		return;
 	}
 
+	// Classic 7.4 height rule, click/auto-walk case. Intermediate levitation tiles are already
+	// routed around (they're non-pathable), but the *clicked destination* tile only has to pass
+	// isWalkable() -- isPathable() is skipped for the endpoint -- so clicking directly on a tile
+	// whose stacked elevation items raise it more than one level above the tile we'd step off
+	// still routes us onto it. The gameserver then refuses that final step, which shows as the
+	// character walking up and getting bumped back. The real client instead stops one square
+	// short with "Sorry, not possible." Reproduce that by dropping the height-blocked final step
+	// so it's never sent, letting the walk end on the adjacent tile; the message is deferred
+	// until we actually arrive there (see checkLocalCreatureMovement()).
+	m_heightBlockStopPos.x = 0xFFFF;
+	if(m_autoWalkDirections.size() >= 2)
+	{
+		Position stepPos = pos;
+		for(size_t i = m_autoWalkDirections.size() - 1; i >= 1; --i)
+			stepPos = stepPos.translatedToDirection(m_autoWalkDirections[i]);
+
+		Position finalPos = stepPos.translatedToDirection(m_autoWalkDirections[0]);
+		Tile* fromTile = g_map.getTile(stepPos);
+		Tile* toTile = g_map.getTile(finalPos);
+		if(fromTile && toTile && (fromTile->getHeightCount() - toTile->getHeightCount() < -1))
+		{
+			m_autoWalkDirections.erase(m_autoWalkDirections.begin()); //drop the height-blocked final step
+			m_autoWalkDestination.x = 0xFFFF; //don't keep re-pathing onto the blocked tile
+			m_heightBlockStopPos = stepPos; //message fires when we reach this tile
+		}
+	}
+
 	if(getAttackID() != 0 && g_engine.getChaseMode() == CHASEMODE_FOLLOW && g_engine.hasAutoChaseOff())
 	{
 		g_engine.setChaseMode(CHASEMODE_STAND);
@@ -1585,6 +1612,7 @@ void Game::stopAutoWalk()
 		m_autoWalkDestination.x = 0xFFFF;
 		m_limitWalkDestination.x = 0xFFFF;
 		m_autoWalkDirections.clear();
+		m_heightBlockStopPos.x = 0xFFFF; //manual override cancels any pending height-block message
 		sendWalk(DIRECTION_INVALID);
 	}
 }
@@ -1611,6 +1639,14 @@ void Game::checkLocalCreatureMovement()
 	Creature* player = g_map.getLocalCreature();
 	if(!player || player->isPreWalking() || player->isWalking() || player->getSpeed() == 0)
 		return;
+
+	// Deferred "Sorry, not possible." for a height-blocked click target (see startAutoWalk):
+	// fires once we've actually arrived on the tile in front of it, like the real client.
+	if(m_heightBlockStopPos.x != 0xFFFF && g_map.getCentralPosition() == m_heightBlockStopPos)
+	{
+		g_game.processTextMessage(MessageFailure, "Sorry, not possible.");
+		m_heightBlockStopPos.x = 0xFFFF;
+	}
 
 	Position& pos = player->getCurrentPosition();
 	if((m_limitWalkDestination.x == 0xFFFF && m_autoWalkDestination.x != 0xFFFF) || (m_limitWalkDestination.x != 0xFFFF && pos == m_limitWalkDestination))

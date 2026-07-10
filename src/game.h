@@ -363,6 +363,7 @@ class Game
 		Position m_autoWalkDestination;
 		Position m_limitWalkDestination;
 		Position m_lastCancelWalkPos;
+		Position m_heightBlockStopPos; //tile to stop on before a height-blocked click target; fires "Sorry, not possible." on arrival
 
 		Uint16 m_playerLevel = 1;
 		Uint16 m_playerMagicLevel = 0;
