@@ -36,6 +36,7 @@ extern ThingManager g_thingManager;
 extern LightSystem g_light;
 extern Game g_game;
 extern Uint32 g_frameTime;
+extern bool g_recreateBattleWindow;
 
 void Creature::preMove(const Position& fromPos, const Position& toPos)
 {
@@ -328,8 +329,13 @@ void Creature::render(Sint32 posX, Sint32 posY)
 	if(!m_thingType)
 		return;
 
+	update(); //still need to advance walk/animation state even while invisible
+
+	if(m_lookType == 0 && m_lookTypeEx == 0)
+		return; //invisible - draw nothing at all. The blue shimmer players see is a separate,
+				//one-shot magic effect triggered when the spell is cast, not part of this render.
+
 	auto& renderer = g_engine.getRender();
-	update();
 
 	posX += getOffsetX();
 	posY += getOffsetY();
@@ -531,6 +537,9 @@ void Creature::renderInformations(Sint32 posX, Sint32 posY, Sint32 drawX, Sint32
 	if(m_health < 1)
 		return;
 
+	if(m_lookType == 0 && m_lookTypeEx == 0)
+		return; //invisible (shimmer effect only) - name/health bar shouldn't reveal identity
+
 	Uint8 red = m_red, green = m_green, blue = m_blue;
 	if(!visible)
 	{
@@ -620,6 +629,9 @@ void Creature::renderInformations(Sint32 posX, Sint32 posY, Sint32 drawX, Sint32
 
 void Creature::renderOnBattle(Sint32 posX, Sint32 posY, bool renderManaBar)
 {
+	if(m_lookType == 0 && m_lookTypeEx == 0)
+		return; //invisible - shouldn't be identifiable via the battle window either
+
 	auto& renderer = g_engine.getRender();
 	if(m_thingType)
 	{
@@ -878,6 +890,8 @@ void Creature::turnDirection(Direction direction)
 
 void Creature::setOutfit(Uint16 lookType, Uint16 lookTypeEx, Uint8 lookHead, Uint8 lookBody, Uint8 lookLegs, Uint8 lookFeet, Uint8 lookAddons, Uint16 lookMount)
 {
+	bool wasInvisible = (m_lookType == 0 && m_lookTypeEx == 0);
+
 	if(lookType == 0)
 	{
 		if(lookTypeEx == 0)
@@ -906,6 +920,13 @@ void Creature::setOutfit(Uint16 lookType, Uint16 lookTypeEx, Uint8 lookHead, Uin
 
 	m_outfit = (lookFeet << 24) | (lookLegs << 16) | (lookBody << 8) | (lookHead);
 	m_lookAddons = lookAddons;
+
+	m_lookType = lookType;
+	m_lookTypeEx = lookTypeEx;
+
+	bool isInvisible = (m_lookType == 0 && m_lookTypeEx == 0);
+	if(wasInvisible != isInvisible)
+		g_recreateBattleWindow = true; //battle list slot needs to appear/disappear to match
 }
 
 void Creature::setSpeed(Uint16 speed)

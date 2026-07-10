@@ -541,6 +541,9 @@ void UTIL_refreshPartyWindow()
 
 bool CanSeeOnBattle(Creature* creature)
 {
+	if(creature->getLookType() == 0 && creature->getLookTypeEx() == 0)
+		return false; //invisible - shouldn't take up a slot in the battle list either
+
 	return !creature->isLocalCreature() && creature->isVisible();
 }
 
@@ -809,6 +812,9 @@ GUI_BattleCreature::GUI_BattleCreature(iRect boxRect, size_t index, bool partyWi
 void GUI_BattleCreature::onMouseMove(Sint32 x, Sint32 y, bool isInsideParent)
 {
 	Creature* creature = g_battleCreatures[m_index];
+	if(creature->getLookType() == 0 && creature->getLookTypeEx() == 0)
+		return; //invisible - shouldn't be selectable/targetable via the battle window either
+
 	if(isInsideParent && m_tRect.isPointInside(x, y))
 		g_game.setSelectID(creature->getId());
 	else if(g_game.getSelectID() == creature->getId())
@@ -817,6 +823,10 @@ void GUI_BattleCreature::onMouseMove(Sint32 x, Sint32 y, bool isInsideParent)
 
 void GUI_BattleCreature::onLMouseDown(Sint32, Sint32)
 {
+	Creature* creature = g_battleCreatures[m_index];
+	if(creature->getLookType() == 0 && creature->getLookTypeEx() == 0)
+		return;
+
 	if(g_mouseAction == 1 && g_engine.hasClassicControl())
 		g_mouseAction = 2;
 	else
@@ -825,6 +835,10 @@ void GUI_BattleCreature::onLMouseDown(Sint32, Sint32)
 
 void GUI_BattleCreature::onLMouseUp(Sint32 x, Sint32 y)
 {
+	Creature* invisCheck = g_battleCreatures[m_index];
+	if(invisCheck->getLookType() == 0 && invisCheck->getLookTypeEx() == 0)
+		return;
+
 	Uint32 selectCreatureID = g_game.getSelectID();
 	if(selectCreatureID != 0 && g_mouseAction != 0)
 	{
@@ -870,6 +884,10 @@ void GUI_BattleCreature::onLMouseUp(Sint32 x, Sint32 y)
 
 void GUI_BattleCreature::onRMouseDown(Sint32, Sint32)
 {
+	Creature* creature = g_battleCreatures[m_index];
+	if(creature->getLookType() == 0 && creature->getLookTypeEx() == 0)
+		return;
+
 	if(g_mouseAction == 1 && g_engine.hasClassicControl())
 		g_mouseAction = 2;
 	else
@@ -878,6 +896,10 @@ void GUI_BattleCreature::onRMouseDown(Sint32, Sint32)
 
 void GUI_BattleCreature::onRMouseUp(Sint32 x, Sint32 y)
 {
+	Creature* invisCheck = g_battleCreatures[m_index];
+	if(invisCheck->getLookType() == 0 && invisCheck->getLookTypeEx() == 0)
+		return;
+
 	Uint32 selectCreatureID = g_game.getSelectID();
 	if(selectCreatureID != 0 && g_mouseAction != 0)
 	{
