@@ -894,10 +894,10 @@ size_t Tile::getThingCount()
 
 Uint16 Tile::getGroundSpeed()
 {
-	if(m_ground && m_ground->getThingType() && m_ground->getThingType()->m_groundSpeed > 0)
-		return m_ground->getThingType()->m_groundSpeed;
-
-	return 150;
+	// Raw items.otb ground speed, no 0->150 fallback: matches servers whose walk scheduler uses
+	// the raw speed (e.g. TVP / The Violet Project, a TFS 1.4-based 7.72 server). Stock TFS 1.x
+	// defaults 0->150 server-side, in which case the original fallback here is the correct match.
+	return (m_ground && m_ground->getThingType() ? m_ground->getThingType()->m_groundSpeed : 150);
 }
 
 Uint16 Tile::getMinimapSpeed()

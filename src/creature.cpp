@@ -1248,8 +1248,10 @@ Sint32 Creature::getStepDuration(Sint32 groundSpeed, bool ignoreDiagonal)
 {
 	Sint32 speed = SDL_static_cast(Sint32, m_speed);
 	speed = (speed < 1 ? 1 : speed);//Make sure we don't get div by 0 exception
-	groundSpeed = (groundSpeed < 1 ? 150 : groundSpeed);
 
+	// Deliberately no 0->150 groundSpeed fallback (see Tile::getGroundSpeed): the step duration
+	// must mirror the server's own formula exactly or the walk animation drifts from the server's
+	// actual step timing. Div-by-zero guards below are kept.
 	Sint32 interval = 1000 * groundSpeed;
 	if(g_game.hasGameFeature(GAME_FEATURE_NEWSPEED_LAW))
 		interval /= (m_cacheFormulatedSpeed > 0 ? m_cacheFormulatedSpeed : 1);
