@@ -1517,6 +1517,15 @@ void Game::startAutoWalk(const Position& toPosition)
 	m_autoWalkDestination = toPosition;
 	m_limitWalkDestination.x = 0xFFFF;
 
+	// A map/screen click to walk cancels an active follow, matching the real client (same reasoning
+	// as the keyboard path in checkMovement()). Idempotent on the auto-walk retries since followId
+	// is already cleared after the first call.
+	if(getFollowID() != 0)
+	{
+		setFollowID(0);
+		sendCancelAttackAndFollow();
+	}
+
 	Creature* player = g_map.getLocalCreature();
 	if(!player || player->isPreWalking() || player->isWalking())
 		return;
@@ -1786,6 +1795,15 @@ void Game::checkMovement(Direction dir)
 {
 	if(m_autoWalkDestination.x != 0xFFFF)
 		stopAutoWalk();
+
+	// Manual keyboard (arrow/WASD) movement cancels an active follow, matching the real client --
+	// taking manual walking control drops you out of follow. (Attack is untouched: follow and
+	// attack are mutually exclusive, so getFollowID() is only set when you're purely following.)
+	if(getFollowID() != 0)
+	{
+		setFollowID(0);
+		sendCancelAttackAndFollow();
+	}
 
 	if(getAttackID() != 0 && g_engine.getChaseMode() == CHASEMODE_FOLLOW && g_engine.hasAutoChaseOff())
 	{
