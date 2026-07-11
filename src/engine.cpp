@@ -3508,7 +3508,10 @@ void Engine::setConsoleHeight(Sint32 height)
 void Engine::update()
 {
 	if(m_ingame)
+	{
 		g_map.update();
+		g_game.update(); //walk-cancel retry system tick (see Game::processWalkCancel())
+	}
 }
 
 void Engine::redraw()

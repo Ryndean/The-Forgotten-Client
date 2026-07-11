@@ -194,6 +194,9 @@ class Game
 		void stopAutoWalk();
 		void checkServerMovement(Direction dir);
 		void checkLocalCreatureMovement();
+		//Per-frame tick for the walk-cancel retry system (called from Engine::update(); see the
+		//block comment on Game::update() in game.cpp for the full picture of what belongs to it)
+		void update();
 		void checkMovement(Direction dir);
 		void releaseMovement();
 
@@ -356,6 +359,7 @@ class Game
 		Uint32 m_playerMaxMana = 0;
 		Uint32 m_icons = 0;
 		Uint32 m_cancelWalkCounter = 0;
+		Uint32 m_walkRetryTime = 0; //walk-cancel retry cooldown deadline; 0 = no retry pending (see Game::update())
 
 		Sint32 m_playerTournamentFactor = 0;
 		Sint32 m_playerCharmPoints = 0;

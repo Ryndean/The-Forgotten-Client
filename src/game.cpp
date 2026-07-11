@@ -590,25 +590,57 @@ void Game::processTextMessage(MessageMode mode, const std::string& text, Uint32 
 
 void Game::processWalkCancel(Direction direction)
 {
+	// === Walk-cancel retry system ===
+	// Extends the resend fix (719f6cd) with a scheduled, resynced retry so a multi-step auto-walk
+	// survives the cancel too. Parts of the system (grep m_walkRetryTime to find them all):
+	//   game.h                        - Uint32 m_walkRetryTime + void update()
+	//   Game::update()               - fires the retry once the cooldown elapses (game.cpp)
+	//   Game::checkLocalCreatureMovement() - suppression guard at the top
+	//   Game::stopAutoWalk()         - clears a pending retry on manual override
+	//   Engine::update()             - per-frame g_game.update() call (engine.cpp)
+	// Rationale: on servers that cancel/wipe the walk queue whenever an action is performed
+	// mid-walk (e.g. TVP-style servers, where ANY action does this), the stock synchronous
+	// startAutoWalk() below re-pathed from a not-yet-settled position and produced a visible
+	// freeze-then-jump; 719f6cd alone re-requests only the current step, so the rest of the
+	// wiped path was lost (walks died 1-2 steps after an action). This hybrid re-requests the
+	// in-flight step to keep the animation seamless AND re-paths the remaining route ~50ms later.
+	// The delay length is not the safety mechanism -- Game::update()'s busy-check is; 50ms is
+	// simply a floor tuned against a 10ms server action cooldown. If your target server rarely
+	// cancels walks you can revert to the stock synchronous startAutoWalk() calls below and drop
+	// the other m_walkRetryTime sites, keeping just the 719f6cd resend above them.
+	if(m_autoWalkDestination.x != 0xFFFF)
+		m_walkRetryTime = g_frameTime + 50;
+
 	Creature* player = g_map.getLocalCreature();
 	if(player)
 	{
-		if(direction != DIRECTION_INVALID && player->getWalkDirection() == direction)
+		if(player->isPreWalking() && direction != DIRECTION_INVALID && player->getWalkDirection() == direction)
 		{
-			if(player->isPreWalking())
-			{
-				// Server aborted the walk, but we are visually moving; retry without breaking the animation.
-				sendWalk(direction);
-				return;
-			}
-			else if(player->isWalking())
-			{
-				return;
-			}
+			// The cancelled step is a still-unconfirmed prewalk in the same direction the server
+			// cancelled: instead of cutting the slide, immediately re-request that single step
+			// (719f6cd). By the time the resend arrives the interrupting action is usually done,
+			// so the already-playing slide becomes retroactively confirmed -- no visual cut.
+			// No stopMove and no turnDirection here: the slide keeps playing toward the tile we
+			// just re-requested. Unlike 719f6cd there is no early return -- the retry and the
+			// give-up bookkeeping below stay armed, which is what recovers the rest of an
+			// auto-walk whose queue the server wiped.
+			sendWalk(direction);
 		}
+		else
+		{
+			player->turnDirection(direction);
 
-		player->stopMove();
-		player->turnDirection(direction);
+			// Creature::move() only updates m_position (via Tile::addThing) when preMove is false --
+			// a prewalk step is purely a cosmetic slide with no backing tile/position confirmation.
+			// Letting a cancelled prewalk "finish naturally" plays out a ghost animation into a tile
+			// the game state never actually moved to; the next retry then computes its path from the
+			// real (unmoved) position and the render has to reconcile -- a visible snap-back. So on
+			// a direction mismatch (server cancelled us into a different facing than our predicted
+			// step), a still-unconfirmed prewalk gets cut immediately; an already-server-confirmed
+			// step (isWalking() true, isPreWalking() false) finishes smoothly.
+			if(player->isPreWalking())
+				player->stopMove();
+		}
 	}
 
 	if(m_autoWalkDestination.x != 0xFFFF)
@@ -622,14 +654,13 @@ void Game::processWalkCancel(Direction direction)
 				stopAutoWalk();
 				m_cancelWalkCounter = 0;
 			}
-			else
-				startAutoWalk(m_autoWalkDestination);
+			// else: retry already scheduled above via m_walkRetryTime
 		}
 		else
 		{
 			m_lastCancelWalkPos = pos;
 			m_cancelWalkCounter = 0;
-			startAutoWalk(m_autoWalkDestination);
+			// retry already scheduled above via m_walkRetryTime
 		}
 	}
 }
@@ -1612,8 +1643,45 @@ void Game::stopAutoWalk()
 		m_autoWalkDestination.x = 0xFFFF;
 		m_limitWalkDestination.x = 0xFFFF;
 		m_autoWalkDirections.clear();
+		m_walkRetryTime = 0; //manual override also cancels any pending walk-cancel retry
 		m_heightBlockStopPos.x = 0xFFFF; //manual override cancels any pending height-block message
 		sendWalk(DIRECTION_INVALID);
+	}
+}
+
+void Game::update()
+{
+	// === Walk-cancel retry system (see the block comment in processWalkCancel()) ===
+	// Fires the scheduled auto-walk retry once its cooldown elapses. The busy-check below is the
+	// real safety mechanism: if the player is still finishing the in-flight step, push the retry
+	// out instead of firing early. Letting it fire while busy would clear m_walkRetryTime with
+	// nothing actually resent, dropping the checkLocalCreatureMovement() suppression early; its
+	// own "continue walking" logic would then resend the instant the step ends, racing the
+	// server's per-tile timer and getting cancelled again (visible as a snap-back).
+	if(m_walkRetryTime != 0 && g_frameTime >= m_walkRetryTime)
+	{
+		Creature* player = g_map.getLocalCreature();
+		if(player && (player->isPreWalking() || player->isWalking()))
+		{
+			m_walkRetryTime = g_frameTime + 50;
+			return;
+		}
+
+		m_walkRetryTime = 0;
+		if(m_autoWalkDestination.x != 0xFFFF)
+			startAutoWalk(m_autoWalkDestination);
+	}
+
+	// Deferred "Sorry, not possible." for a height-blocked click target (see startAutoWalk):
+	// fires once we've actually arrived on the tile in front of it, like the real client.
+	if(m_heightBlockStopPos.x != 0xFFFF)
+	{
+		Creature* player = g_map.getLocalCreature();
+		if(player && !player->isWalking() && !player->isPreWalking() && g_map.getCentralPosition() == m_heightBlockStopPos)
+		{
+			g_game.processTextMessage(MessageFailure, "Sorry, not possible.");
+			m_heightBlockStopPos.x = 0xFFFF;
+		}
 	}
 }
 
@@ -1636,17 +1704,15 @@ void Game::checkServerMovement(Direction dir)
 
 void Game::checkLocalCreatureMovement()
 {
+	// See processWalkCancel(): while a walk-cancel retry is on cooldown, don't opportunistically
+	// start a new step here -- Game::update() fires the real, resynced retry once the cooldown
+	// elapses.
+	if(m_walkRetryTime != 0)
+		return;
+
 	Creature* player = g_map.getLocalCreature();
 	if(!player || player->isPreWalking() || player->isWalking() || player->getSpeed() == 0)
 		return;
-
-	// Deferred "Sorry, not possible." for a height-blocked click target (see startAutoWalk):
-	// fires once we've actually arrived on the tile in front of it, like the real client.
-	if(m_heightBlockStopPos.x != 0xFFFF && g_map.getCentralPosition() == m_heightBlockStopPos)
-	{
-		g_game.processTextMessage(MessageFailure, "Sorry, not possible.");
-		m_heightBlockStopPos.x = 0xFFFF;
-	}
 
 	Position& pos = player->getCurrentPosition();
 	if((m_limitWalkDestination.x == 0xFFFF && m_autoWalkDestination.x != 0xFFFF) || (m_limitWalkDestination.x != 0xFFFF && pos == m_limitWalkDestination))
