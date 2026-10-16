@@ -38,9 +38,13 @@ void ScreenText::addMessage(MessageMode mode, std::string text)
 	else
 		extraTime = m_messages.back().m_endTime;
 
+	// The stay duration has to be computed before the text is moved: text.length() after std::move is
+	// always 0, so every message only got STATICTEXT_MINIMUM_STAY_DURATION regardless of its length
+	const Uint32 stayDuration = UTIL_max<Uint32>(STATICTEXT_PER_CHAR_STAY_DURATION * SDL_static_cast(Uint32, text.length()), STATICTEXT_MINIMUM_STAY_DURATION);
+
 	ScreenTextMessage newMessage;
 	newMessage.m_message = std::move(text);
-	newMessage.m_endTime = extraTime + UTIL_max<Uint32>(STATICTEXT_PER_CHAR_STAY_DURATION * SDL_static_cast(Uint32, text.length()), STATICTEXT_MINIMUM_STAY_DURATION);
+	newMessage.m_endTime = extraTime + stayDuration;
 	newMessage.m_mode = mode;
 	m_messages.push_back(newMessage);
 }
