@@ -617,8 +617,11 @@ void Game::processWalkCancel(Direction direction)
 	Creature* player = g_map.getLocalCreature();
 	if(player)
 	{
-		if(player->isPreWalking() && direction != DIRECTION_INVALID && player->getWalkDirection() == direction)
+		if(player->isPreWalking() && direction != DIRECTION_INVALID && player->getWalkDirection() == direction && player->getWalkStartTime() != m_resentWalkStartTime)
 		{
+			// Only once per step: a step the server refuses outright (a wall, a closed door) would
+			// otherwise bounce cancel -> resend -> cancel for as long as the prewalk lasts
+			m_resentWalkStartTime = player->getWalkStartTime();
 			// The cancelled step is a still-unconfirmed prewalk in the same direction the server
 			// cancelled: instead of cutting the slide, immediately re-request that single step
 			// (719f6cd). By the time the resend arrives the interrupting action is usually done,

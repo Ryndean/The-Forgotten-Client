@@ -130,6 +130,7 @@ class Creature : public Thing
 		SDL_INLINE Sint32 getWalkOffsetY() {return m_walkOffsetY;}
 		SDL_INLINE Direction getDirection() {return m_direction;}
 		SDL_INLINE Direction getWalkDirection() {return m_walkDirection;}
+		SDL_INLINE Uint32 getWalkStartTime() {return m_walkStartTime;}
 
 		std::pair<Sint32, Sint32> getDisplacement();
 		Sint32 getOffsetX(bool checkPreWalk = false);

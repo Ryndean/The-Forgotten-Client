@@ -365,6 +365,7 @@ class Game
 		bool m_serverUpdate = false; //a server packet is being parsed (see checkLocalCreatureMovement())
 		bool m_movementDeferred = false;
 		bool m_startingAutoWalk = false; //startAutoWalk() is running checkLocalCreatureMovement()
+		Uint32 m_resentWalkStartTime = 0; //start time of the prewalk step already resent once (processWalkCancel())
 
 		Sint32 m_playerTournamentFactor = 0;
 		Sint32 m_playerCharmPoints = 0;
