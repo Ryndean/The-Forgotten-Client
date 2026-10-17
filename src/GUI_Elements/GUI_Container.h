@@ -47,6 +47,7 @@ class GUI_Container : public GUI_Element
 		GUI_Element* getActiveElement() {return m_actElement;}
 		void setActiveElement(GUI_Element* actElement);
 		void validateScrollBar();
+		void resetScrollBar() {m_scrollBar.setScrollPos(0);}
 
 		Sint32 getLastPosX() {return m_lastPosX;}
 		Sint32 getLastPosY() {return m_lastPosY;}
