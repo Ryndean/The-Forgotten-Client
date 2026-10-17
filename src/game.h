@@ -364,6 +364,7 @@ class Game
 		Uint32 m_walkRetryTime = 0; //walk-cancel retry cooldown deadline; 0 = no retry pending (see Game::update())
 		bool m_serverUpdate = false; //a server packet is being parsed (see checkLocalCreatureMovement())
 		bool m_movementDeferred = false;
+		bool m_startingAutoWalk = false; //startAutoWalk() is running checkLocalCreatureMovement()
 
 		Sint32 m_playerTournamentFactor = 0;
 		Sint32 m_playerCharmPoints = 0;

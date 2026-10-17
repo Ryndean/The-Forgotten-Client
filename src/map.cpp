@@ -1129,8 +1129,13 @@ PathFind Map::findPath(std::vector<Direction>& directions, const Position& start
 	if(!found)
 		return PathFind_ReturnNoWay;
 
+	// Rebuild the route from the end back to the start (so steps are stored last step first). Each
+	// step remembers whether the client knows both of its tiles: a route can lead through unexplored
+	// ground that is only guessed from the automap.
+	std::vector<std::pair<Direction, bool>> steps;
 	Sint32 prevx = endPos.x;
 	Sint32 prevy = endPos.y;
+	bool prevKnown = (getTile(endPos) != NULL);
 	do
 	{
 		pos.x = found->x;
@@ -1142,35 +1147,50 @@ PathFind Map::findPath(std::vector<Direction>& directions, const Position& start
 		prevx = pos.x;
 		prevy = pos.y;
 
-		endTile = getTile(pos);
-		if(endTile)
+		Direction dir = DIRECTION_INVALID;
+		if(dx == 1)
 		{
-			//We can only send the tiles we know
-			if(dx == 1)
-			{
-				if(dy == 1)
-					directions.emplace_back(DIRECTION_NORTHWEST);
-				else if(dy == -1)
-					directions.emplace_back(DIRECTION_SOUTHWEST);
-				else
-					directions.emplace_back(DIRECTION_WEST);
-			}
-			else if(dx == -1)
-			{
-				if(dy == 1)
-					directions.emplace_back(DIRECTION_NORTHEAST);
-				else if(dy == -1)
-					directions.emplace_back(DIRECTION_SOUTHEAST);
-				else
-					directions.emplace_back(DIRECTION_EAST);
-			}
-			else if(dy == 1)
-				directions.emplace_back(DIRECTION_NORTH);
+			if(dy == 1)
+				dir = DIRECTION_NORTHWEST;
 			else if(dy == -1)
-				directions.emplace_back(DIRECTION_SOUTH);
+				dir = DIRECTION_SOUTHWEST;
+			else
+				dir = DIRECTION_WEST;
 		}
+		else if(dx == -1)
+		{
+			if(dy == 1)
+				dir = DIRECTION_NORTHEAST;
+			else if(dy == -1)
+				dir = DIRECTION_SOUTHEAST;
+			else
+				dir = DIRECTION_EAST;
+		}
+		else if(dy == 1)
+			dir = DIRECTION_NORTH;
+		else if(dy == -1)
+			dir = DIRECTION_SOUTH;
+
+		const bool known = (getTile(pos) != NULL);
+		if(dir != DIRECTION_INVALID)
+			steps.emplace_back(dir, known && prevKnown);
+
+		prevKnown = known;
 		found = found->parent;
 	} while(found);
+
+	// We can only send the tiles we know, and only an unbroken stretch of them from the start: the
+	// old code skipped unknown steps wherever they were, leaving gaps (the auto-walk limit could
+	// even land on the start position, which made startAutoWalk() and checkLocalCreatureMovement()
+	// call each other until the stack overflowed), and it kept the step INTO the first unknown tile,
+	// which auto-walk then walked blindly - into a wall if the guess was wrong. Auto-walk re-paths
+	// from the end of the known stretch once more of the map is known.
+	size_t knownSteps = 0;
+	for(std::vector<std::pair<Direction, bool>>::reverse_iterator it = steps.rbegin(), end = steps.rend(); it != end && it->second; ++it)
+		++knownSteps;
+
+	for(size_t i = steps.size() - knownSteps; i < steps.size(); ++i)
+		directions.push_back(steps[i].first);
 	return PathFind_ReturnSuccessfull;
 }
 

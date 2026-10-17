@@ -59,6 +59,7 @@ void Game::reset()
 {
 	m_serverUpdate = false;
 	m_movementDeferred = false;
+	m_startingAutoWalk = false;
 	m_autoWalkDestination = Position(0xFFFF, 0xFFFF, 0xFF);
 	m_limitWalkDestination = Position(0xFFFF, 0xFFFF, 0xFF);
 	m_lastCancelWalkPos = Position(0xFFFF, 0xFFFF, 0xFF);
@@ -1630,8 +1631,24 @@ void Game::startAutoWalk(const Position& toPosition)
 	}
 
 	m_limitWalkDestination = pos.translatedToDirections(m_autoWalkDirections);
+	if(m_autoWalkDirections.empty() || m_limitWalkDestination == pos)
+	{
+		// A route that ends where we stand would re-path forever (checkLocalCreatureMovement() sees
+		// the limit reached and calls straight back into here)
+		g_game.processTextMessage(MessageFailure, "There is no way.");
+		m_autoWalkDestination.x = 0xFFFF;
+		m_limitWalkDestination.x = 0xFFFF;
+		m_autoWalkDirections.clear();
+		return;
+	}
+
 	sendAutoWalk(m_autoWalkDirections);
+	if(m_startingAutoWalk)
+		return; //never recurse: the outer call already runs checkLocalCreatureMovement()
+
+	m_startingAutoWalk = true;
 	checkLocalCreatureMovement();
+	m_startingAutoWalk = false;
 }
 
 void Game::stopAutoWalk()
