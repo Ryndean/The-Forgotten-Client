@@ -1875,7 +1875,7 @@ void Game::checkLocalCreatureMovement()
 			{
 				//Check if we can go up
 				Tile* tile = g_map.getTile(pos);
-				if(tile && tile->getTileElevation() >= ITEM_MAX_ELEVATION)
+				if(tile && tile->calculateElevation() >= ITEM_MAX_ELEVATION)
 				{
 					Position uppos = topos;
 					if(uppos.up())
@@ -1896,7 +1896,7 @@ void Game::checkLocalCreatureMovement()
 					if(downpos.down())
 					{
 						toTile = g_map.getTile(downpos);
-						if(toTile && toTile->isWalkable() && toTile->getTileElevation() >= ITEM_MAX_ELEVATION)
+						if(toTile && toTile->isWalkable() && toTile->calculateElevation() >= ITEM_MAX_ELEVATION)
 						{
 							//Check what server thinks about our movement :)
 							sendwalk = true;

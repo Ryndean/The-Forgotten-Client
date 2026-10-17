@@ -59,6 +59,28 @@ void Tile::reset()
 	m_effects.clear();
 }
 
+Sint32 Tile::calculateElevation()
+{
+	// Same rules as render(), which only fills m_tileElevation when the tile is drawn - so a tile
+	// rebuilt by a map packet would report 0 to movement prediction until its first frame
+	Sint32 elevation = 0;
+	if(m_ground && m_ground->hasElevation())
+		elevation = UTIL_min<Sint32>(ITEM_MAX_ELEVATION, elevation + m_ground->getElevation());
+
+	for(Item* item : m_topItems)
+	{
+		if(item->getTopOrder() != 3 && item->hasElevation())
+			elevation = UTIL_min<Sint32>(ITEM_MAX_ELEVATION, elevation + item->getElevation());
+	}
+
+	for(Item* item : m_downItems)
+	{
+		if(item->hasElevation())
+			elevation = UTIL_min<Sint32>(ITEM_MAX_ELEVATION, elevation + item->getElevation());
+	}
+	return elevation;
+}
+
 void Tile::render(Sint32 posX, Sint32 posY, bool visible_tile)
 {
 	Sint32 displacedItems = 0;

@@ -88,6 +88,7 @@ class Tile
 		Uint16 getMinimapSpeed();
 		Uint16 getMinimapColor();
 		SDL_INLINE Sint32 getTileElevation() {return m_tileElevation;}
+		Sint32 calculateElevation(); //computed from the items, valid before the tile is drawn
 		SDL_INLINE Position& getPosition() {return m_position;}
 
 		bool hasground();
