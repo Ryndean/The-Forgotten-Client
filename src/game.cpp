@@ -57,6 +57,8 @@ Game::~Game()
 
 void Game::reset()
 {
+	m_serverUpdate = false;
+	m_movementDeferred = false;
 	m_autoWalkDestination = Position(0xFFFF, 0xFFFF, 0xFF);
 	m_limitWalkDestination = Position(0xFFFF, 0xFFFF, 0xFF);
 	m_lastCancelWalkPos = Position(0xFFFF, 0xFFFF, 0xFF);
@@ -1702,8 +1704,33 @@ void Game::checkServerMovement(Direction dir)
 	}
 }
 
+void Game::beginServerUpdate()
+{
+	m_serverUpdate = true;
+}
+
+void Game::endServerUpdate()
+{
+	m_serverUpdate = false;
+	if(m_movementDeferred)
+	{
+		m_movementDeferred = false;
+		checkLocalCreatureMovement();
+	}
+}
+
 void Game::checkLocalCreatureMovement()
 {
+	// While a server packet is being parsed the map can be half rebuilt (a floor change can arrive
+	// as a full map description, which deletes every tile and re-adds them one by one): predicting
+	// a step from that state uses tiles that don't exist yet. Run the check once the whole packet
+	// is applied, still in the same frame (Protocol::onRecv calls endServerUpdate()).
+	if(m_serverUpdate)
+	{
+		m_movementDeferred = true;
+		return;
+	}
+
 	// See processWalkCancel(): while a walk-cancel retry is on cooldown, don't opportunistically
 	// start a new step here -- Game::update() fires the real, resynced retry once the cooldown
 	// elapses.

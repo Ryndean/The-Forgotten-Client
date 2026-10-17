@@ -405,10 +405,12 @@ bool Tile::addThing(Thing* thing, bool insertThing, bool moveCreature)
 		else
 			m_creatures.push_back(creature);
 
+		// Set the position first: for the local player stopMove() runs checkLocalCreatureMovement(),
+		// which predicts the next step from getCurrentPosition(). A floor change re-adds the player
+		// here (not as a move), so the old order predicted the step from the floor just left.
+		creature->setCurrentPosition(m_position);
 		if(!moveCreature)
 			creature->stopMove();
-
-		creature->setCurrentPosition(m_position);
 	}
 	else if(thing->isItem())
 	{
@@ -495,8 +497,9 @@ bool Tile::insertThing(Thing* thing, Uint32 stackpos)
 		else
 			m_creatures.insert(m_creatures.begin() + stackpos, creature);
 
-		creature->stopMove();
+		// Position before stopMove(), see addThing()
 		creature->setCurrentPosition(m_position);
+		creature->stopMove();
 	}
 	else if(thing->isItem())
 	{

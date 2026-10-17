@@ -21,10 +21,12 @@
 
 #include "protocol.h"
 #include "rsa.h"
+#include "game.h"
 
 RSA g_rsa;
 
 extern Connection* g_connection;
+extern Game g_game;
 
 Protocol::~Protocol()
 {
@@ -134,8 +136,11 @@ bool Protocol::onRecv(InputMessage& msg)
 	if(!msg.eof())
 		UTIL_protocolDebugDumpMessage(protocolName, "recv", msg.getReadBuffer(), msg.getUnreadSize(), 0, msg.peekU8());
 
+	// Movement prediction waits until the whole packet is applied (see Game::checkLocalCreatureMovement())
+	g_game.beginServerUpdate();
 	while(!msg.eof())
 		parseMessage(msg);
+	g_game.endServerUpdate();
 
 	return true;
 }
