@@ -27,7 +27,8 @@
 struct ScreenTextMessage
 {
 	std::string m_message;
-	Uint32 m_endTime;
+	Uint32 m_endTime; // set when the message comes on screen
+	Uint32 m_stayDuration;
 	MessageMode m_mode;
 };
 

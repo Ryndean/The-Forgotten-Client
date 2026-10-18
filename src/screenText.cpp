@@ -27,25 +27,32 @@ extern Uint32 g_frameTime;
 
 void ScreenText::addMessage(MessageMode mode, std::string text)
 {
-	Uint32 extraTime = g_frameTime;
 	if(m_messages.size() >= SDL_static_cast(size_t, (m_screenPosition == ONSCREEN_MESSAGE_TOP ? 10 : 1)))
 	{
 		m_dirty = true;
 		m_messages.erase(m_messages.begin());
+		// the next queued message is on screen from now on
+		if(!m_messages.empty())
+			m_messages.front().m_endTime = g_frameTime + m_messages.front().m_stayDuration;
 	}
-	else if(m_messages.empty())
-		m_dirty = true;
-	else
-		extraTime = m_messages.back().m_endTime;
 
 	// The stay duration has to be computed before the text is moved: text.length() after std::move is
 	// always 0, so every message only got STATICTEXT_MINIMUM_STAY_DURATION regardless of its length
 	const Uint32 stayDuration = UTIL_max<Uint32>(STATICTEXT_PER_CHAR_STAY_DURATION * SDL_static_cast(Uint32, text.length()), STATICTEXT_MINIMUM_STAY_DURATION);
 
+	// A queued message's time only starts once it is on screen. Computing it when the message was added gave every
+	// message added after the top queue overflowed an end time counted from now, so it had usually expired before
+	// its turn came and only flashed up for a single frame
 	ScreenTextMessage newMessage;
 	newMessage.m_message = std::move(text);
-	newMessage.m_endTime = extraTime + stayDuration;
+	newMessage.m_stayDuration = stayDuration;
+	newMessage.m_endTime = 0;
 	newMessage.m_mode = mode;
+	if(m_messages.empty())
+	{
+		m_dirty = true;
+		newMessage.m_endTime = g_frameTime + stayDuration;
+	}
 	m_messages.push_back(newMessage);
 }
 
@@ -126,8 +133,10 @@ bool ScreenText::update()
 		m_messages.erase(m_messages.begin());
 		if(m_messages.empty())
 			return false;
-		else
-			composeText();
+
+		// the next message's time starts now that it is shown
+		m_messages.front().m_endTime = g_frameTime + m_messages.front().m_stayDuration;
+		composeText();
 	}
 	else if(m_dirty)
 		composeText();
